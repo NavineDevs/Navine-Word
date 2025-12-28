@@ -1,0 +1,1614 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Navine Word</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0a0f1f" />
+  <link rel="icon" href="data:," />
+
+  <!-- DOCX export lib (client-side). If offline/no CDN, DOCX export will fallback to HTML. -->
+  <script defer src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/file-saver@2.0.5/dist/FileSaver.min.js"></script>
+
+  <style>
+    :root{
+      --bg:#05070c;
+      --panel:#0b1222;
+      --panel2:#0a1020;
+      --card:#0d1630;
+      --royal:#1f3cff;
+      --royal2:#0f2bff;
+      --electric:#00c8ff;
+      --text:#e6f1ff;
+      --muted:rgba(230,241,255,.72);
+      --border:rgba(31,60,255,.35);
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+      --danger:#ff3b5c;
+      --ok:#42f59b;
+      --page:#ffffff;
+      --pageText:#111827;
+      --r:18px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      background: radial-gradient(circle at 15% 10%, rgba(31,60,255,.25), transparent 45%),
+                  radial-gradient(circle at 85% 0%, rgba(0,200,255,.18), transparent 45%),
+                  radial-gradient(circle at 30% 95%, rgba(31,60,255,.15), transparent 50%),
+                  linear-gradient(180deg,#05070c,#05070c 50%, #03040a);
+      color:var(--text);
+      font-family: system-ui, Segoe UI, Arial;
+      overflow:hidden;
+    }
+
+    /* App shell */
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-rows: 56px 44px 1fr 34px;
+    }
+
+    /* Top bar */
+    .topbar{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 14px;
+      background: linear-gradient(180deg, rgba(11,18,34,.98), rgba(8,12,24,.98));
+      border-bottom:1px solid rgba(255,255,255,.06);
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:800; letter-spacing:.3px;
+      padding:8px 12px;
+      border-radius:999px;
+      background: linear-gradient(90deg, rgba(31,60,255,.25), rgba(0,200,255,.10));
+      border:1px solid rgba(31,60,255,.35);
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      user-select:none;
+    }
+    .dot{
+      width:12px; height:12px; border-radius:50%;
+      background: radial-gradient(circle at 30% 30%, #fff, rgba(255,255,255,.2) 30%, transparent 60%),
+                  linear-gradient(180deg, var(--royal), var(--electric));
+      box-shadow: 0 0 18px rgba(31,60,255,.55);
+    }
+    .title{
+      display:flex; flex-direction:column; line-height:1.05;
+    }
+    .title small{color:var(--muted); font-weight:600}
+    .spacer{flex:1}
+
+    .top-actions{display:flex; gap:8px; align-items:center}
+    .btn{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:9px 12px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.09);
+      background: linear-gradient(180deg, rgba(13,22,48,.95), rgba(8,12,24,.95));
+      color:var(--text);
+      cursor:pointer;
+      user-select:none;
+      transition: transform .06s ease, border-color .15s ease, background .15s ease;
+      font-weight:700;
+    }
+    .btn:hover{border-color:rgba(31,60,255,.6)}
+    .btn:active{transform: translateY(1px)}
+    .btn.primary{
+      border-color:rgba(31,60,255,.55);
+      background: linear-gradient(180deg, rgba(31,60,255,.35), rgba(13,22,48,.92));
+      box-shadow: 0 10px 24px rgba(31,60,255,.15);
+    }
+    .btn.danger{border-color:rgba(255,59,92,.45)}
+    .btn.ghost{background:transparent}
+    .pill{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.08);
+      color:var(--muted);
+      font-weight:700;
+      font-size:12px;
+      user-select:none;
+    }
+
+    /* Tabs row */
+    .tabs{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      background: linear-gradient(180deg, rgba(10,16,32,.95), rgba(6,9,18,.95));
+      border-bottom:1px solid rgba(255,255,255,.06);
+      overflow:auto;
+      scrollbar-width: thin;
+    }
+    .tab{
+      display:flex; align-items:center; gap:8px;
+      padding:8px 10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.08);
+      background: rgba(13,22,48,.55);
+      color:var(--muted);
+      cursor:pointer;
+      white-space:nowrap;
+      user-select:none;
+    }
+    .tab.active{
+      color:var(--text);
+      border-color:rgba(31,60,255,.55);
+      background: linear-gradient(180deg, rgba(31,60,255,.22), rgba(13,22,48,.62));
+      box-shadow: 0 10px 20px rgba(0,0,0,.25);
+    }
+    .tab input{
+      width:160px; max-width:35vw;
+      background:transparent; border:none; outline:none;
+      color:inherit; font-weight:800;
+    }
+    .x{
+      width:18px; height:18px; border-radius:6px;
+      display:grid; place-items:center;
+      border:1px solid rgba(255,255,255,.08);
+      color:rgba(230,241,255,.7);
+    }
+    .x:hover{border-color:rgba(255,255,255,.16)}
+
+    /* Main split */
+    .main{
+      display:grid;
+      grid-template-columns: 310px 1fr 330px;
+      gap:10px;
+      padding:10px;
+      min-height:0;
+    }
+    .panel{
+      background: linear-gradient(180deg, rgba(11,18,34,.78), rgba(7,10,20,.82));
+      border:1px solid rgba(255,255,255,.07);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+    }
+    .panel h3{
+      margin:0;
+      padding:12px 14px;
+      font-size:13px;
+      letter-spacing:.4px;
+      text-transform:uppercase;
+      color:rgba(230,241,255,.82);
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(13,22,48,.5), rgba(11,18,34,.25));
+    }
+    .panel .content{
+      padding:12px 12px 14px;
+      overflow:auto;
+      min-height:0;
+    }
+
+    /* Toolbar controls */
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+    }
+    .field{
+      display:flex; flex-direction:column; gap:6px;
+      padding:10px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.06);
+      background: rgba(13,22,48,.35);
+    }
+    .field label{
+      font-size:12px;
+      color:rgba(230,241,255,.7);
+      font-weight:800;
+      letter-spacing:.2px;
+    }
+    select,input[type="number"],input[type="text"],input[type="color"]{
+      width:100%;
+      border-radius:12px;
+      padding:10px 10px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(6,9,18,.65);
+      color:var(--text);
+      outline:none;
+      font-weight:700;
+    }
+    input[type="range"]{width:100%}
+    .row{display:flex; gap:8px; flex-wrap:wrap}
+    .tool{
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.09);
+      background: rgba(13,22,48,.45);
+      cursor:pointer;
+      user-select:none;
+      font-weight:900;
+      color:rgba(230,241,255,.88);
+      min-width:44px;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+    }
+    .tool:hover{border-color:rgba(31,60,255,.55)}
+    .tool.active{
+      border-color:rgba(31,60,255,.7);
+      background: rgba(31,60,255,.22);
+      box-shadow: 0 0 0 3px rgba(31,60,255,.10) inset;
+    }
+    .tool.small{padding:8px 9px; font-weight:800; min-width:auto}
+    .hint{color:rgba(230,241,255,.65); font-size:12px; line-height:1.3}
+
+    /* Editor area */
+    .workspace{
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+      background: linear-gradient(180deg, rgba(11,18,34,.35), rgba(7,10,20,.35));
+      border:1px solid rgba(255,255,255,.07);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .ribbon{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:10px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      background: linear-gradient(180deg, rgba(13,22,48,.55), rgba(10,16,32,.30));
+      overflow:auto;
+      scrollbar-width: thin;
+    }
+    .ribbon .group{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding-right:10px;
+      margin-right:4px;
+      border-right:1px solid rgba(255,255,255,.06);
+    }
+    .ribbon .group:last-child{border-right:none}
+    .ribbon .mini{
+      padding:8px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.09);
+      background: rgba(13,22,48,.45);
+      color:var(--text);
+      cursor:pointer;
+      font-weight:900;
+      user-select:none;
+    }
+    .ribbon .mini:hover{border-color:rgba(31,60,255,.55)}
+    .ribbon select, .ribbon input[type="number"]{
+      width:auto;
+      padding:8px 10px;
+      border-radius:12px;
+    }
+
+    .paper-wrap{
+      flex:1;
+      overflow:auto;
+      padding:18px;
+      background: radial-gradient(circle at top, rgba(31,60,255,.10), transparent 38%),
+                  radial-gradient(circle at 85% 0, rgba(0,200,255,.08), transparent 35%),
+                  rgba(6,9,18,.35);
+    }
+    .page{
+      width: min(900px, 100%);
+      margin: 0 auto 18px;
+      background: var(--page);
+      color: var(--pageText);
+      border-radius: 12px;
+      box-shadow: 0 30px 90px rgba(0,0,0,.45);
+      border: 1px solid rgba(0,0,0,.06);
+      padding: 60px 64px;
+      transform-origin: top center;
+    }
+    .page[contenteditable="true"]:focus{
+      outline: 3px solid rgba(31,60,255,.22);
+      outline-offset: 6px;
+    }
+
+    /* Status bar */
+    .status{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:6px 12px;
+      background: linear-gradient(180deg, rgba(10,16,32,.95), rgba(6,9,18,.95));
+      border-top:1px solid rgba(255,255,255,.06);
+      color:rgba(230,241,255,.78);
+      font-size:12px;
+    }
+    .status .right{margin-left:auto; display:flex; gap:10px; align-items:center}
+    .k{padding:4px 8px; border:1px solid rgba(255,255,255,.10); border-radius:999px}
+    .ok{color:var(--ok); font-weight:900}
+    .warn{color:#ffd166; font-weight:900}
+
+    /* Modal */
+    .modal{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,.58);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:16px;
+      z-index:50;
+    }
+    .modal.show{display:flex}
+    .dialog{
+      width:min(820px, 96vw);
+      background: linear-gradient(180deg, rgba(11,18,34,.98), rgba(7,10,20,.98));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      box-shadow: 0 40px 120px rgba(0,0,0,.7);
+      overflow:hidden;
+    }
+    .dialog header{
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      display:flex; align-items:center; gap:10px;
+    }
+    .dialog header strong{letter-spacing:.3px}
+    .dialog .body{padding:14px}
+    .dialog .body textarea{
+      width:100%;
+      min-height:280px;
+      border-radius:14px;
+      padding:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(6,9,18,.65);
+      color:var(--text);
+      outline:none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .dialog footer{
+      padding:12px 14px;
+      border-top:1px solid rgba(255,255,255,.06);
+      display:flex;
+      justify-content:flex-end;
+      gap:10px;
+    }
+
+    /* Responsive */
+    @media (max-width: 1100px){
+      .main{grid-template-columns: 1fr}
+      .panel.left, .panel.right{display:none}
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+    <!-- Top -->
+    <div class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div class="title">
+          <div>Navine Word</div>
+          <small>Black × Royal Blue • Offline-capable</small>
+        </div>
+      </div>
+
+      <span class="pill" id="installPill">Web App: Ready</span>
+      <span class="pill" id="offlinePill">Offline: Checking…</span>
+
+      <div class="spacer"></div>
+
+      <div class="top-actions">
+        <button class="btn primary" id="newDocBtn">+ New</button>
+        <button class="btn" id="saveBtn">Save</button>
+        <button class="btn" id="saveAsBtn">Save As…</button>
+        <button class="btn" id="loadBtn">Load</button>
+        <button class="btn" id="exportDocxBtn">Export .docx</button>
+        <button class="btn ghost" id="helpBtn">Help</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="tabs"></div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Left panel -->
+      <div class="panel left">
+        <h3>Formatting</h3>
+        <div class="content">
+          <div class="grid">
+            <div class="field">
+              <label>Font</label>
+              <select id="fontFamily"></select>
+            </div>
+            <div class="field">
+              <label>Size</label>
+              <select id="fontSize">
+                <option value="1">8</option>
+                <option value="2">10</option>
+                <option value="3" selected>12</option>
+                <option value="4">14</option>
+                <option value="5">18</option>
+                <option value="6">24</option>
+                <option value="7">36</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Text Color</label>
+              <input id="foreColor" type="color" value="#111827" />
+            </div>
+            <div class="field">
+              <label>Highlight</label>
+              <input id="hiliteColor" type="color" value="#fff3a3" />
+            </div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="row">
+            <div class="tool" data-cmd="bold"><b>B</b></div>
+            <div class="tool" data-cmd="italic"><i>I</i></div>
+            <div class="tool" data-cmd="underline"><u>U</u></div>
+            <div class="tool" data-cmd="strikeThrough"><s>S</s></div>
+            <div class="tool" data-cmd="subscript">x<sub>2</sub></div>
+            <div class="tool" data-cmd="superscript">x<sup>2</sup></div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="row">
+            <div class="tool small" data-cmd="justifyLeft">Left</div>
+            <div class="tool small" data-cmd="justifyCenter">Center</div>
+            <div class="tool small" data-cmd="justifyRight">Right</div>
+            <div class="tool small" data-cmd="justifyFull">Justify</div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="row">
+            <div class="tool small" data-cmd="insertUnorderedList">• List</div>
+            <div class="tool small" data-cmd="insertOrderedList">1. List</div>
+            <div class="tool small" data-cmd="outdent">Outdent</div>
+            <div class="tool small" data-cmd="indent">Indent</div>
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="row">
+            <div class="tool small" id="linkBtn">Link</div>
+            <div class="tool small" id="imageBtn">Image</div>
+            <div class="tool small" id="tableBtn">Table</div>
+            <div class="tool small" id="hrBtn">HR</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="field">
+            <label>Custom Font Upload (TTF/OTF/WOFF/WOFF2)</label>
+            <input id="fontUpload" type="file" accept=".ttf,.otf,.woff,.woff2" />
+            <div class="hint">Uploads apply only in your browser (saved inside your .navdoc too).</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="field">
+            <label>Find / Replace</label>
+            <input id="findText" type="text" placeholder="Find…" />
+            <input id="replaceText" type="text" placeholder="Replace with…" />
+            <div class="row">
+              <div class="tool small" id="findNextBtn">Find Next</div>
+              <div class="tool small" id="replaceBtn">Replace</div>
+              <div class="tool small" id="replaceAllBtn">Replace All</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Center editor -->
+      <div class="workspace">
+        <div class="ribbon">
+          <div class="group">
+            <div class="mini" id="undoBtn">Undo</div>
+            <div class="mini" id="redoBtn">Redo</div>
+            <div class="mini" id="clearFmtBtn">Clear</div>
+          </div>
+
+          <div class="group">
+            <label style="font-size:12px;color:var(--muted);font-weight:800">Zoom</label>
+            <input id="zoom" type="range" min="60" max="160" value="100" />
+            <span class="pill" id="zoomLabel">100%</span>
+          </div>
+
+          <div class="group">
+            <div class="mini" id="togglePagesBtn">Page View</div>
+            <div class="mini" id="toggleSpellBtn">Spellcheck</div>
+          </div>
+
+          <div class="group">
+            <div class="mini" id="codeViewBtn">Code</div>
+            <div class="mini" id="printBtn">Print</div>
+          </div>
+
+          <div class="group">
+            <label style="font-size:12px;color:var(--muted);font-weight:800">Auto-save</label>
+            <select id="autosave">
+              <option value="off">Off</option>
+              <option value="5">Every 5s</option>
+              <option value="15" selected>Every 15s</option>
+              <option value="30">Every 30s</option>
+            </select>
+            <span class="pill" id="saveState">Saved</span>
+          </div>
+        </div>
+
+        <div class="paper-wrap" id="paperWrap">
+          <div class="page" id="editor" contenteditable="true" spellcheck="true">
+            <h1 style="margin-top:0">Navine Word</h1>
+            <p>Start typing…</p>
+            <p><b>Tip:</b> Use the toolbar on the left or the ribbon up top. Save as <code>.navdoc</code> for full fidelity.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right panel -->
+      <div class="panel right">
+        <h3>Files & Export</h3>
+        <div class="content">
+          <div class="field">
+            <label>Quick Export</label>
+            <div class="row">
+              <div class="tool small" id="exportNavdocBtn">.navdoc</div>
+              <div class="tool small" id="exportHtmlBtn">.html</div>
+              <div class="tool small" id="exportTxtBtn">.txt</div>
+              <div class="tool small" id="exportMdBtn">.md</div>
+            </div>
+            <div class="hint">For “Word-like” export, use <b>Export .docx</b> (best-effort).</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="field">
+            <label>Local Library (autosaves in this browser)</label>
+            <div class="row">
+              <div class="tool small" id="saveLocalBtn">Save to Library</div>
+              <div class="tool small" id="openLocalBtn">Open Library</div>
+              <div class="tool small" id="clearLocalBtn">Clear Library</div>
+            </div>
+            <div class="hint">Library is stored in <code>localStorage</code>.</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="field">
+            <label>Document Stats</label>
+            <div class="hint" id="stats">Words: 0 • Chars: 0 • Lines: 0</div>
+          </div>
+
+          <div style="height:12px"></div>
+
+          <div class="field">
+            <label>Web App Install</label>
+            <div class="row">
+              <div class="tool small" id="installBtn">Install</div>
+              <div class="tool small" id="checkUpdatesBtn">Check Cache</div>
+            </div>
+            <div class="hint">Install as an app (PWA) on desktop/mobile.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="status">
+      <span class="k" id="docNameK">Untitled</span>
+      <span id="cursorInfo">Ln 1, Col 1</span>
+      <span class="right">
+        <span class="k" id="formatInfo">Normal</span>
+        <span class="k" id="netInfo">Network: —</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Hidden file input -->
+  <input id="fileInput" type="file" accept=".navdoc,.html,.txt,.md,.json" hidden />
+  <input id="imgInput" type="file" accept="image/*" hidden />
+
+  <!-- Code modal -->
+  <div class="modal" id="modal">
+    <div class="dialog">
+      <header>
+        <strong id="modalTitle">Code View</strong>
+        <span class="pill" id="modalHint">HTML</span>
+        <div class="spacer"></div>
+        <button class="btn" id="modalClose">Close</button>
+      </header>
+      <div class="body">
+        <textarea id="codeArea" spellcheck="false"></textarea>
+        <div class="hint" style="margin-top:8px">
+          Editing the HTML here will replace the document body.
+        </div>
+      </div>
+      <footer>
+        <button class="btn" id="modalCancel">Cancel</button>
+        <button class="btn primary" id="modalApply">Apply</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Library modal (reuses same modal) -->
+  <script>
+    // ========= Utilities =========
+    const $ = (s, el=document) => el.querySelector(s);
+    const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+    const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
+
+    function downloadBlob(blob, filename){
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 200);
+    }
+
+    function htmlToText(html){
+      const div = document.createElement("div");
+      div.innerHTML = html;
+      return div.innerText.replace(/\u00A0/g, " ");
+    }
+
+    function htmlToMarkdown(html){
+      // lightweight conversion (keeps it simple)
+      let t = html;
+      t = t.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n");
+      t = t.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n");
+      t = t.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n");
+      t = t.replace(/<b[^>]*>|<strong[^>]*>/gi, "**").replace(/<\/b>|<\/strong>/gi, "**");
+      t = t.replace(/<i[^>]*>|<em[^>]*>/gi, "*").replace(/<\/i>|<\/em>/gi, "*");
+      t = t.replace(/<u[^>]*>(.*?)<\/u>/gi, "$1"); // markdown underline not standard
+      t = t.replace(/<br\s*\/?>/gi, "\n");
+      t = t.replace(/<\/p>/gi, "\n\n").replace(/<p[^>]*>/gi, "");
+      t = t.replace(/<li[^>]*>(.*?)<\/li>/gi, "- $1\n");
+      t = t.replace(/<\/ul>/gi, "\n").replace(/<ul[^>]*>/gi, "");
+      t = t.replace(/<\/ol>/gi, "\n").replace(/<ol[^>]*>/gi, "");
+      t = t.replace(/<hr[^>]*>/gi, "\n---\n");
+      // remove remaining tags
+      t = t.replace(/<[^>]+>/g, "");
+      return t.trim() + "\n";
+    }
+
+    function getSelectionInfo(){
+      // best-effort line/col based on text content
+      const sel = window.getSelection();
+      if(!sel || sel.rangeCount === 0) return {line:1,col:1};
+      const range = sel.getRangeAt(0).cloneRange();
+      range.selectNodeContents(editor);
+      range.setEnd(sel.anchorNode, sel.anchorOffset);
+      const text = range.toString();
+      const lines = text.split("\n");
+      return { line: lines.length, col: lines[lines.length-1].length + 1 };
+    }
+
+    // ========= State =========
+    const editor = $("#editor");
+    const tabsEl = $("#tabs");
+
+    const BUILTIN_FONTS = [
+      "Arial","Calibri","Cambria","Candara","Comic Sans MS","Consolas","Courier New",
+      "Georgia","Impact","Inter","Palatino Linotype","Segoe UI","Tahoma","Times New Roman","Trebuchet MS","Verdana"
+    ];
+
+    let docs = [];
+    let activeId = null;
+
+    const LIB_KEY = "navine_word_library_v1";
+    const AUTOSAVE_KEY = "navine_word_autosave_v1";
+
+    // custom fonts saved per-doc
+    // { name, mime, dataUrl }
+    async function loadFontFromDataUrl(name, dataUrl){
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const font = new FontFace(name, blob);
+      await font.load();
+      document.fonts.add(font);
+      return true;
+    }
+
+    function currentDoc(){
+      return docs.find(d => d.id === activeId);
+    }
+
+    function markDirty(isDirty){
+      const doc = currentDoc();
+      if(!doc) return;
+      doc.dirty = isDirty;
+      $("#saveState").textContent = isDirty ? "Unsaved" : "Saved";
+      $("#saveState").className = "pill " + (isDirty ? "warn" : "ok");
+      renderTabs();
+    }
+
+    function updateStats(){
+      const text = htmlToText(editor.innerHTML).trim();
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const chars = text.length;
+      const lines = text ? text.split("\n").length : 0;
+      $("#stats").textContent = `Words: ${words} • Chars: ${chars} • Lines: ${lines}`;
+    }
+
+    function renderTabs(){
+      tabsEl.innerHTML = "";
+      for(const d of docs){
+        const tab = document.createElement("div");
+        tab.className = "tab" + (d.id===activeId ? " active":"");
+        tab.onclick = () => switchDoc(d.id);
+
+        const nameInput = document.createElement("input");
+        nameInput.value = d.name;
+        nameInput.title = "Rename";
+        nameInput.onclick = (e) => e.stopPropagation();
+        nameInput.oninput = () => {
+          d.name = nameInput.value || "Untitled";
+          $("#docNameK").textContent = d.name;
+          tab.title = d.name;
+        };
+        nameInput.onchange = () => { persistAutosave(); };
+
+        const dirty = document.createElement("span");
+        dirty.textContent = d.dirty ? "•" : "";
+        dirty.style.color = d.dirty ? "var(--electric)" : "transparent";
+        dirty.style.fontWeight = "900";
+
+        const close = document.createElement("div");
+        close.className = "x";
+        close.textContent = "×";
+        close.title = "Close tab";
+        close.onclick = (e) => { e.stopPropagation(); closeDoc(d.id); };
+
+        tab.appendChild(dirty);
+        tab.appendChild(nameInput);
+        tab.appendChild(close);
+        tabsEl.appendChild(tab);
+      }
+    }
+
+    async function switchDoc(id){
+      const doc = docs.find(d => d.id === id);
+      if(!doc) return;
+
+      // save current editor HTML into current doc before switching
+      const cur = currentDoc();
+      if(cur){
+        cur.html = editor.innerHTML;
+      }
+
+      activeId = id;
+
+      // load fonts for this doc
+      if(doc.customFonts?.length){
+        for(const f of doc.customFonts){
+          try{ await loadFontFromDataUrl(f.name, f.dataUrl); } catch {}
+        }
+      }
+
+      editor.innerHTML = doc.html || "<p></p>";
+      $("#docNameK").textContent = doc.name;
+      markDirty(!!doc.dirty);
+      updateStats();
+      renderTabs();
+      persistAutosave();
+    }
+
+    function newDoc(seedHtml){
+      const d = {
+        id: uid(),
+        name: "Untitled",
+        html: seedHtml ?? `<h1 style="margin-top:0">New Document</h1><p>Start typing…</p>`,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        dirty: false,
+        customFonts: []
+      };
+      docs.push(d);
+      if(activeId === null) activeId = d.id;
+      renderTabs();
+      switchDoc(d.id);
+    }
+
+    function closeDoc(id){
+      const idx = docs.findIndex(d=>d.id===id);
+      if(idx<0) return;
+
+      const wasActive = (docs[idx].id===activeId);
+      docs.splice(idx,1);
+
+      if(!docs.length){
+        newDoc();
+        return;
+      }
+      if(wasActive){
+        activeId = docs[Math.max(0, idx-1)].id;
+        switchDoc(activeId);
+      }else{
+        renderTabs();
+      }
+      persistAutosave();
+    }
+
+    // ========= Editor commands =========
+    function exec(cmd, value=null){
+      editor.focus();
+      try{
+        document.execCommand(cmd, false, value);
+        markDirty(true);
+        updateStats();
+        updateCursor();
+      }catch(e){
+        console.warn("execCommand failed:", cmd, e);
+      }
+      refreshActiveTools();
+    }
+
+    function refreshActiveTools(){
+      const checks = ["bold","italic","underline","strikeThrough","subscript","superscript"];
+      for(const c of checks){
+        const isOn = document.queryCommandState(c);
+        const el = $(`.tool[data-cmd="${c}"]`);
+        if(el) el.classList.toggle("active", !!isOn);
+      }
+      // format block info
+      let block = document.queryCommandValue("formatBlock") || "Normal";
+      block = (""+block).replace(/[<>]/g,"");
+      $("#formatInfo").textContent = block || "Normal";
+    }
+
+    function applyFontFamily(name){
+      // execCommand fontName works for many browsers; still best-effort.
+      exec("fontName", name);
+    }
+    function applyFontSize(n){
+      exec("fontSize", n); // 1-7
+    }
+    function applyColor(cmd, hex){
+      exec(cmd, hex);
+    }
+
+    // ========= Insert helpers =========
+    async function insertImageFromFile(file){
+      const url = await new Promise((res, rej)=>{
+        const r = new FileReader();
+        r.onload = () => res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+      exec("insertImage", url);
+    }
+
+    function insertTable(rows, cols){
+      rows = Math.max(1, Math.min(50, rows|0));
+      cols = Math.max(1, Math.min(20, cols|0));
+      const table = document.createElement("table");
+      table.style.width = "100%";
+      table.style.borderCollapse = "collapse";
+      table.style.margin = "10px 0";
+      table.setAttribute("border","1");
+      table.style.border = "1px solid #cbd5e1";
+
+      for(let r=0;r<rows;r++){
+        const tr = document.createElement("tr");
+        for(let c=0;c<cols;c++){
+          const td = document.createElement("td");
+          td.style.border = "1px solid #cbd5e1";
+          td.style.padding = "8px";
+          td.innerHTML = "&nbsp;";
+          tr.appendChild(td);
+        }
+        table.appendChild(tr);
+      }
+      editor.focus();
+      const range = window.getSelection().getRangeAt(0);
+      range.insertNode(table);
+      markDirty(true);
+      updateStats();
+    }
+
+    // ========= Save / Load =========
+    function buildNavdoc(){
+      const doc = currentDoc();
+      if(!doc) return null;
+      // sync current html
+      doc.html = editor.innerHTML;
+      doc.updatedAt = Date.now();
+
+      return {
+        type: "navine-word-doc",
+        version: 1,
+        name: doc.name,
+        createdAt: doc.createdAt,
+        updatedAt: doc.updatedAt,
+        html: doc.html,
+        customFonts: doc.customFonts || [],
+        meta: {
+          app: "Navine Word",
+          theme: "black-royal-blue"
+        }
+      };
+    }
+
+    function saveNavdoc(filename){
+      const data = buildNavdoc();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {type:"application/json"});
+      downloadBlob(blob, filename.endsWith(".navdoc") ? filename : (filename + ".navdoc"));
+      markDirty(false);
+      persistAutosave();
+    }
+
+    function saveHtml(filename){
+      const doc = currentDoc();
+      if(!doc) return;
+      doc.html = editor.innerHTML;
+
+      const html = `<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(doc.name)}</title></head>
+<body>${doc.html}</body></html>`;
+
+      downloadBlob(new Blob([html], {type:"text/html"}), filename.endsWith(".html")?filename:(filename+".html"));
+      markDirty(false);
+      persistAutosave();
+    }
+
+    function saveTxt(filename){
+      const text = htmlToText(editor.innerHTML);
+      downloadBlob(new Blob([text], {type:"text/plain"}), filename.endsWith(".txt")?filename:(filename+".txt"));
+      markDirty(false);
+      persistAutosave();
+    }
+
+    function saveMd(filename){
+      const md = htmlToMarkdown(editor.innerHTML);
+      downloadBlob(new Blob([md], {type:"text/markdown"}), filename.endsWith(".md")?filename:(filename+".md"));
+      markDirty(false);
+      persistAutosave();
+    }
+
+    function escapeHtml(s){
+      return (s??"").replace(/[&<>"']/g, (c)=>({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    async function loadAnyFile(file){
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const text = await file.text();
+
+      if(ext === "navdoc" || ext === "json"){
+        let data;
+        try{ data = JSON.parse(text); }catch{ throw new Error("Invalid JSON"); }
+        if(data?.type !== "navine-word-doc"){
+          throw new Error("Not a Navine Word document.");
+        }
+        const d = {
+          id: uid(),
+          name: data.name || "Imported",
+          html: data.html || "<p></p>",
+          createdAt: data.createdAt || Date.now(),
+          updatedAt: data.updatedAt || Date.now(),
+          dirty: false,
+          customFonts: Array.isArray(data.customFonts) ? data.customFonts : []
+        };
+        docs.push(d);
+        renderTabs();
+        await switchDoc(d.id);
+        return;
+      }
+
+      if(ext === "html" || ext === "htm"){
+        // load body innerHTML
+        const tmp = document.createElement("div");
+        tmp.innerHTML = text;
+        // naive body extraction
+        const bodyMatch = text.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+        const bodyHtml = bodyMatch ? bodyMatch[1] : text;
+        const d = { id: uid(), name: file.name.replace(/\.(html|htm)$/i,""), html: bodyHtml, createdAt: Date.now(), updatedAt: Date.now(), dirty:false, customFonts:[] };
+        docs.push(d);
+        renderTabs();
+        await switchDoc(d.id);
+        return;
+      }
+
+      if(ext === "txt"){
+        const safe = escapeHtml(text).replace(/\n/g,"<br>");
+        const d = { id: uid(), name: file.name.replace(/\.txt$/i,""), html: `<p>${safe}</p>`, createdAt: Date.now(), updatedAt: Date.now(), dirty:false, customFonts:[] };
+        docs.push(d);
+        renderTabs();
+        await switchDoc(d.id);
+        return;
+      }
+
+      if(ext === "md"){
+        // basic markdown -> html (light)
+        const lines = text.split("\n");
+        let out = "";
+        for(const line of lines){
+          if(/^###\s+/.test(line)) out += `<h3>${escapeHtml(line.replace(/^###\s+/,""))}</h3>`;
+          else if(/^##\s+/.test(line)) out += `<h2>${escapeHtml(line.replace(/^##\s+/,""))}</h2>`;
+          else if(/^#\s+/.test(line)) out += `<h1>${escapeHtml(line.replace(/^#\s+/,""))}</h1>`;
+          else if(/^\-\s+/.test(line)) out += `<ul><li>${escapeHtml(line.replace(/^\-\s+/,""))}</li></ul>`;
+          else out += `<p>${escapeHtml(line)}</p>`;
+        }
+        const d = { id: uid(), name: file.name.replace(/\.md$/i,""), html: out, createdAt: Date.now(), updatedAt: Date.now(), dirty:false, customFonts:[] };
+        docs.push(d);
+        renderTabs();
+        await switchDoc(d.id);
+        return;
+      }
+
+      throw new Error("Unsupported file type.");
+    }
+
+    // ========= Local Library =========
+    function readLibrary(){
+      try{
+        return JSON.parse(localStorage.getItem(LIB_KEY) || "[]");
+      }catch{
+        return [];
+      }
+    }
+    function writeLibrary(items){
+      localStorage.setItem(LIB_KEY, JSON.stringify(items));
+    }
+
+    function saveToLibrary(){
+      const data = buildNavdoc();
+      const lib = readLibrary();
+      lib.unshift({ id: uid(), name: data.name, savedAt: Date.now(), navdoc: data });
+      writeLibrary(lib.slice(0, 50)); // limit
+      $("#saveState").textContent = "Saved";
+      $("#saveState").className = "pill ok";
+    }
+
+    function clearLibrary(){
+      localStorage.removeItem(LIB_KEY);
+    }
+
+    // ========= Autosave (session restore) =========
+    function persistAutosave(){
+      const payload = {
+        docs: docs.map(d => ({
+          ...d,
+          html: (d.id===activeId) ? editor.innerHTML : d.html
+        })),
+        activeId
+      };
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+    }
+
+    async function restoreAutosave(){
+      try{
+        const raw = localStorage.getItem(AUTOSAVE_KEY);
+        if(!raw) return false;
+        const data = JSON.parse(raw);
+        if(!data?.docs?.length) return false;
+        docs = data.docs;
+        activeId = data.activeId || docs[0].id;
+        renderTabs();
+        await switchDoc(activeId);
+        return true;
+      }catch{
+        return false;
+      }
+    }
+
+    // ========= Find/Replace =========
+    let lastFindIndex = 0;
+    function findNext(){
+      const query = $("#findText").value;
+      if(!query) return;
+
+      const text = editor.innerText;
+      const idx = text.toLowerCase().indexOf(query.toLowerCase(), lastFindIndex);
+      if(idx === -1){
+        lastFindIndex = 0;
+        return;
+      }
+      lastFindIndex = idx + query.length;
+
+      // highlight by creating a range via walking text nodes (best-effort)
+      const range = document.createRange();
+      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+      let pos = 0, startNode=null, startOffset=0, endNode=null, endOffset=0;
+
+      while(walker.nextNode()){
+        const node = walker.currentNode;
+        const len = node.nodeValue.length;
+        if(!startNode && pos + len >= idx){
+          startNode = node;
+          startOffset = idx - pos;
+        }
+        if(startNode && pos + len >= idx + query.length){
+          endNode = node;
+          endOffset = (idx + query.length) - pos;
+          break;
+        }
+        pos += len;
+      }
+      if(startNode && endNode){
+        range.setStart(startNode, startOffset);
+        range.setEnd(endNode, endOffset);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        editor.focus();
+      }
+    }
+
+    function replaceOne(){
+      const query = $("#findText").value;
+      const rep = $("#replaceText").value;
+      if(!query) return;
+
+      const sel = window.getSelection();
+      if(sel && sel.rangeCount){
+        const s = sel.toString();
+        if(s.toLowerCase() === query.toLowerCase()){
+          exec("insertText", rep);
+          return;
+        }
+      }
+      findNext();
+    }
+
+    function replaceAll(){
+      const query = $("#findText").value;
+      const rep = $("#replaceText").value;
+      if(!query) return;
+      const html = editor.innerHTML;
+      // convert to text-replace within HTML cautiously? We'll do innerText replace then set as plaintext paragraphs.
+      const text = editor.innerText;
+      const newText = text.split(query).join(rep);
+      const safe = escapeHtml(newText).replace(/\n/g,"<br>");
+      editor.innerHTML = `<p>${safe}</p>`;
+      markDirty(true);
+      updateStats();
+    }
+
+    // ========= DOCX Export (best-effort) =========
+    function stripToPlainRunsFromHtml(html){
+      // best-effort: convert to plain text paragraphs while keeping headings
+      const container = document.createElement("div");
+      container.innerHTML = html;
+
+      const blocks = [];
+      for(const child of container.childNodes){
+        if(child.nodeType === 3){
+          const t = child.textContent.trim();
+          if(t) blocks.push({type:"p", text:t});
+          continue;
+        }
+        if(child.nodeType !== 1) continue;
+        const tag = child.tagName.toLowerCase();
+        const text = (child.innerText || "").trim();
+        if(!text) continue;
+        if(tag==="h1") blocks.push({type:"h1", text});
+        else if(tag==="h2") blocks.push({type:"h2", text});
+        else if(tag==="h3") blocks.push({type:"h3", text});
+        else blocks.push({type:"p", text});
+      }
+      if(!blocks.length){
+        const t = (container.innerText||"").trim();
+        if(t) blocks.push({type:"p", text:t});
+      }
+      return blocks;
+    }
+
+    async function exportDocx(){
+      const doc = currentDoc();
+      if(!doc) return;
+
+      const hasDocx = !!(window.docx && window.saveAs);
+      if(!hasDocx){
+        // fallback
+        saveHtml(doc.name || "document");
+        alert("DOCX library not available (offline/no CDN). Exported as HTML instead.");
+        return;
+      }
+
+      const blocks = stripToPlainRunsFromHtml(editor.innerHTML);
+
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = window.docx;
+
+      const children = blocks.map(b=>{
+        if(b.type==="h1") return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_1 });
+        if(b.type==="h2") return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_2 });
+        if(b.type==="h3") return new Paragraph({ text: b.text, heading: HeadingLevel.HEADING_3 });
+        return new Paragraph({ children:[ new TextRun(b.text) ] });
+      });
+
+      const d = new Document({ sections: [{ children }] });
+      const blob = await Packer.toBlob(d);
+      window.saveAs(blob, (doc.name || "Navine-Word") + ".docx");
+      markDirty(false);
+      persistAutosave();
+    }
+
+    // ========= Modal =========
+    const modal = $("#modal");
+    const codeArea = $("#codeArea");
+    let modalMode = "code"; // "code" | "library"
+
+    function showCodeModal(){
+      modalMode = "code";
+      $("#modalTitle").textContent = "Code View";
+      $("#modalHint").textContent = "HTML";
+      codeArea.value = editor.innerHTML;
+      modal.classList.add("show");
+    }
+
+    function showLibraryModal(){
+      modalMode = "library";
+      $("#modalTitle").textContent = "Local Library";
+      $("#modalHint").textContent = "JSON";
+      const lib = readLibrary();
+      codeArea.value = JSON.stringify(lib.map(x=>({
+        name: x.name,
+        savedAt: new Date(x.savedAt).toISOString(),
+        bytes: JSON.stringify(x.navdoc).length
+      })), null, 2);
+      modal.classList.add("show");
+    }
+
+    function closeModal(){ modal.classList.remove("show"); }
+
+    // ========= UI wiring =========
+    $("#newDocBtn").onclick = () => newDoc();
+
+    $("#saveBtn").onclick = () => {
+      const d = currentDoc();
+      if(!d) return;
+      // quick save to library + navdoc download
+      saveToLibrary();
+      saveNavdoc(d.name || "Untitled");
+    };
+
+    $("#saveAsBtn").onclick = () => {
+      const name = prompt("Save As (filename, no extension):", currentDoc()?.name || "Untitled");
+      if(!name) return;
+      const choice = prompt("Type: navdoc / html / txt / md", "navdoc")?.toLowerCase();
+      if(choice==="html") saveHtml(name);
+      else if(choice==="txt") saveTxt(name);
+      else if(choice==="md") saveMd(name);
+      else saveNavdoc(name);
+    };
+
+    $("#loadBtn").onclick = () => $("#fileInput").click();
+    $("#fileInput").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if(!file) return;
+      try{
+        await loadAnyFile(file);
+      }catch(err){
+        alert("Load failed: " + err.message);
+      }
+    });
+
+    $("#exportNavdocBtn").onclick = () => saveNavdoc(currentDoc()?.name || "Untitled");
+    $("#exportHtmlBtn").onclick = () => saveHtml(currentDoc()?.name || "Untitled");
+    $("#exportTxtBtn").onclick = () => saveTxt(currentDoc()?.name || "Untitled");
+    $("#exportMdBtn").onclick = () => saveMd(currentDoc()?.name || "Untitled");
+    $("#exportDocxBtn").onclick = exportDocx;
+    $("#printBtn").onclick = () => window.print();
+
+    $("#helpBtn").onclick = () => {
+      alert(
+`Navine Word Tips:
+• Use Save for .navdoc (best fidelity) + browser Library backup.
+• Load supports .navdoc/.json, .html, .txt, .md.
+• Upload custom fonts (TTF/OTF/WOFF/WOFF2) and they’ll be embedded into .navdoc.
+• Install as a Web App (PWA) using Install button (best in Chrome/Edge).`
+      );
+    };
+
+    // left toolbar command buttons
+    $$(".tool[data-cmd]").forEach(btn=>{
+      btn.addEventListener("click", ()=> exec(btn.dataset.cmd));
+    });
+
+    // ribbon buttons
+    $("#undoBtn").onclick = () => exec("undo");
+    $("#redoBtn").onclick = () => exec("redo");
+    $("#clearFmtBtn").onclick = () => exec("removeFormat");
+
+    $("#linkBtn").onclick = () => {
+      const url = prompt("Enter URL (https://...):");
+      if(!url) return;
+      exec("createLink", url);
+    };
+
+    $("#imageBtn").onclick = () => $("#imgInput").click();
+    $("#imgInput").addEventListener("change", async (e)=>{
+      const f = e.target.files?.[0];
+      e.target.value = "";
+      if(!f) return;
+      await insertImageFromFile(f);
+    });
+
+    $("#tableBtn").onclick = () => {
+      const r = parseInt(prompt("Rows?", "3") || "3", 10);
+      const c = parseInt(prompt("Columns?", "3") || "3", 10);
+      insertTable(r,c);
+    };
+
+    $("#hrBtn").onclick = () => exec("insertHorizontalRule");
+
+    // font controls
+    function initFontDropdown(){
+      const ff = $("#fontFamily");
+      ff.innerHTML = "";
+      for(const f of BUILTIN_FONTS){
+        const opt = document.createElement("option");
+        opt.value = f; opt.textContent = f;
+        ff.appendChild(opt);
+      }
+      ff.value = "Calibri";
+    }
+
+    $("#fontFamily").onchange = (e)=> applyFontFamily(e.target.value);
+    $("#fontSize").onchange = (e)=> applyFontSize(e.target.value);
+    $("#foreColor").oninput = (e)=> applyColor("foreColor", e.target.value);
+    $("#hiliteColor").oninput = (e)=> applyColor("hiliteColor", e.target.value);
+
+    // custom font upload
+    $("#fontUpload").addEventListener("change", async (e)=>{
+      const file = e.target.files?.[0];
+      e.target.value = "";
+      if(!file) return;
+
+      const ok = /\.(ttf|otf|woff2?|)$/i.test(file.name);
+      if(!ok){
+        alert("Unsupported font file.");
+        return;
+      }
+
+      const dataUrl = await new Promise((res, rej)=>{
+        const r = new FileReader();
+        r.onload = ()=> res(r.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      });
+
+      const fontName = prompt("Name this font (how it appears in the font list):", file.name.replace(/\.[^.]+$/,"")) || "CustomFont";
+      try{
+        await loadFontFromDataUrl(fontName, dataUrl);
+
+        // add to dropdown if missing
+        const ff = $("#fontFamily");
+        if(![...ff.options].some(o=>o.value===fontName)){
+          const opt = document.createElement("option");
+          opt.value = fontName;
+          opt.textContent = fontName + " (Custom)";
+          ff.appendChild(opt);
+        }
+        ff.value = fontName;
+        applyFontFamily(fontName);
+
+        // store inside doc
+        const doc = currentDoc();
+        doc.customFonts = doc.customFonts || [];
+        doc.customFonts.push({ name: fontName, mime: file.type || "font/*", dataUrl });
+        markDirty(true);
+        persistAutosave();
+      }catch(err){
+        alert("Font load failed.");
+      }
+    });
+
+    // find/replace
+    $("#findNextBtn").onclick = findNext;
+    $("#replaceBtn").onclick = replaceOne;
+    $("#replaceAllBtn").onclick = replaceAll;
+
+    // zoom + page view
+    const paperWrap = $("#paperWrap");
+    const zoom = $("#zoom");
+    function applyZoom(){
+      const z = parseInt(zoom.value,10);
+      $("#zoomLabel").textContent = z + "%";
+      editor.style.transform = `scale(${z/100})`;
+      editor.style.width = (100/(z/100)) + "%"; // keep layout stable
+    }
+    zoom.oninput = () => applyZoom();
+    applyZoom();
+
+    let pageView = true;
+    $("#togglePagesBtn").onclick = ()=>{
+      pageView = !pageView;
+      if(pageView){
+        editor.classList.remove("flat");
+        paperWrap.style.padding = "18px";
+        editor.style.borderRadius = "12px";
+        editor.style.boxShadow = "0 30px 90px rgba(0,0,0,.45)";
+        editor.style.border = "1px solid rgba(0,0,0,.06)";
+      }else{
+        paperWrap.style.padding = "10px";
+        editor.style.borderRadius = "16px";
+        editor.style.boxShadow = "none";
+        editor.style.border = "2px dashed rgba(31,60,255,.25)";
+      }
+    };
+
+    // spellcheck
+    let spell = true;
+    $("#toggleSpellBtn").onclick = ()=>{
+      spell = !spell;
+      editor.setAttribute("spellcheck", spell ? "true":"false");
+      alert("Spellcheck: " + (spell ? "ON":"OFF"));
+    };
+
+    // code view modal
+    $("#codeViewBtn").onclick = showCodeModal;
+    $("#modalClose").onclick = closeModal;
+    $("#modalCancel").onclick = closeModal;
+    modal.addEventListener("click", (e)=>{ if(e.target===modal) closeModal(); });
+
+    $("#modalApply").onclick = ()=>{
+      if(modalMode === "code"){
+        editor.innerHTML = codeArea.value;
+        markDirty(true);
+        updateStats();
+        closeModal();
+      }else{
+        closeModal();
+      }
+    };
+
+    // local library actions
+    $("#saveLocalBtn").onclick = saveToLibrary;
+    $("#openLocalBtn").onclick = ()=>{
+      const lib = readLibrary();
+      if(!lib.length){
+        alert("Library is empty.");
+        return;
+      }
+      // pick
+      const pick = prompt(
+        "Type a number to open:\n" +
+        lib.map((x,i)=>`${i+1}) ${x.name} (${new Date(x.savedAt).toLocaleString()})`).join("\n"),
+        "1"
+      );
+      const idx = (parseInt(pick||"0",10)-1);
+      if(idx<0 || idx>=lib.length) return;
+
+      const data = lib[idx].navdoc;
+      const d = { id: uid(), name: data.name || "From Library", html: data.html || "<p></p>", createdAt: data.createdAt||Date.now(), updatedAt: data.updatedAt||Date.now(), dirty:false, customFonts: data.customFonts||[] };
+      docs.push(d);
+      renderTabs();
+      switchDoc(d.id);
+    };
+
+    $("#clearLocalBtn").onclick = ()=>{
+      if(confirm("Clear library? This removes saved docs from this browser only.")){
+        clearLibrary();
+        alert("Library cleared.");
+      }
+    };
+
+    // Autosave interval
+    let autosaveTimer = null;
+    function setAutosave(){
+      if(autosaveTimer) clearInterval(autosaveTimer);
+      const val = $("#autosave").value;
+      if(val === "off") return;
+      const sec = parseInt(val,10);
+      autosaveTimer = setInterval(()=>{
+        const doc = currentDoc();
+        if(!doc) return;
+        doc.html = editor.innerHTML;
+        doc.updatedAt = Date.now();
+        persistAutosave();
+      }, sec*1000);
+    }
+    $("#autosave").onchange = setAutosave;
+    setAutosave();
+
+    // Track edits
+    editor.addEventListener("input", ()=>{
+      const doc = currentDoc();
+      if(!doc) return;
+      doc.html = editor.innerHTML;
+      doc.updatedAt = Date.now();
+      markDirty(true);
+      persistAutosave();
+      updateStats();
+    });
+
+    function updateCursor(){
+      const {line,col} = getSelectionInfo();
+      $("#cursorInfo").textContent = `Ln ${line}, Col ${col}`;
+    }
+    document.addEventListener("selectionchange", ()=>{
+      if(document.activeElement === editor){
+        updateCursor();
+        refreshActiveTools();
+      }
+    });
+    editor.addEventListener("keyup", updateCursor);
+    editor.addEventListener("click", updateCursor);
+
+    // Network / offline indicator
+    function updateOnline(){
+      const online = navigator.onLine;
+      $("#netInfo").textContent = "Network: " + (online ? "Online" : "Offline");
+      $("#offlinePill").textContent = "Offline: " + (online ? "No" : "Yes");
+      $("#offlinePill").style.borderColor = online ? "rgba(255,255,255,.10)" : "rgba(66,245,155,.45)";
+    }
+    window.addEventListener("online", updateOnline);
+    window.addEventListener("offline", updateOnline);
+    updateOnline();
+
+    // ========= PWA install =========
+    let deferredPrompt = null;
+    window.addEventListener("beforeinstallprompt", (e)=>{
+      e.preventDefault();
+      deferredPrompt = e;
+      $("#installPill").textContent = "Web App: Installable";
+      $("#installPill").style.borderColor = "rgba(66,245,155,.45)";
+    });
+
+    $("#installBtn").onclick = async ()=>{
+      if(!deferredPrompt){
+        alert("Install prompt not available yet. Try Chrome/Edge, and make sure you're not already installed.");
+        return;
+      }
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+    };
+
+    $("#checkUpdatesBtn").onclick = async ()=>{
+      if("serviceWorker" in navigator){
+        const reg = await navigator.serviceWorker.getRegistration();
+        if(reg){
+          await reg.update();
+          alert("Checked for updates.");
+        }else{
+          alert("No service worker registered yet.");
+        }
+      }
+    };
+
+    // Service worker register
+    (async ()=>{
+      if("serviceWorker" in navigator){
+        try{
+          await navigator.serviceWorker.register("./sw.js");
+          $("#offlinePill").textContent = navigator.onLine ? "Offline: No" : "Offline: Yes";
+        }catch{
+          $("#offlinePill").textContent = "Offline: Unavailable";
+        }
+      }else{
+        $("#offlinePill").textContent = "Offline: Not supported";
+      }
+    })();
+
+    // ========= Initialize =========
+    initFontDropdown();
+
+    (async ()=>{
+      const restored = await restoreAutosave();
+      if(!restored) newDoc();
+      updateStats();
+      refreshActiveTools();
+      updateCursor();
+    })();
+  </script>
+</body>
+</html>
